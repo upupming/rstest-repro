@@ -74,6 +74,48 @@ full TS transform for runtime-imported files, or is "match Node" the intended
 (and final) semantics? Our `loadConfig` keeps these cases `test.skip`ped for
 now.
 
+
+## 5. Verified fixed on canary 1c6016a (PR #1414 / #1415)
+
+All kept as passing regression tests in `test/`:
+
+- aliased mock calls (`import { rstest as vi }` + `vi.mock(...)`) now **throw
+  loudly** instead of silently no-oping — exactly the failure-visibility we
+  hoped for
+- automocking a huge module (`rstest.mock('@rsbuild/core', { mock: true })`)
+  no longer blows the worker heap (was SIGABRT/OOM)
+- factory-mocking a Node builtin (`node:os`) now works
+  (`test/fixed-builtin-and-inbody-mock.test.ts`)
+- `rstest.mock(...)` inside a test body now works
+- automock without a static import anchor works (lodash-es and
+  @rsbuild/core, both npm and a standalone pnpm project)
+
+## 6. One remaining case we could NOT minimize (repros only in the lynx-stack monorepo)
+
+In `lynx-family/lynx-stack` (branch `chore/cleanup-webpack-residuals`,
+pnpm 11 monorepo), `rstest.mock('@rsbuild/core', { mock: true })` is still
+invisible to a **dynamic-only** import (no static anchor in the test file);
+with a static `import * as core from '@rsbuild/core'` it works. The same
+case passes here both under npm (`test/fixed-automock-rsbuild-dynamic.test.ts`)
+and under a standalone pnpm project (`pnpm-automock-demo/`), even with
+multiple peer-hashed `@rsbuild/core` instances in `.pnpm` — so it seems to
+need the full monorepo dependency graph. Repro inside lynx-stack:
+
+```bash
+git clone -b chore/cleanup-webpack-residuals https://github.com/lynx-family/lynx-stack
+cd lynx-stack && pnpm install
+cd packages/rspeedy/core
+cat > test/__probe.test.ts <<'TS'
+import { expect, rstest, test } from '@rstest/core'
+rstest.mock('@rsbuild/core', { mock: true })
+test('automock dynamic view (no anchor)', async () => {
+  const core = await import('@rsbuild/core')
+  expect(rstest.isMockFunction(core.createRsbuild)).toBe(true)
+})
+TS
+npx rstest run test/__probe.test.ts   # fails: createRsbuild is the real one
+```
+
 ## Environment
 
 - Node.js: v24.12.0

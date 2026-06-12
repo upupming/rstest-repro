@@ -1,0 +1,14 @@
+{
+  "name": "pnpm-automock-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "rstest run"
+  },
+  "devDependencies": {
+    "@rsbuild/core": "2.0.11",
+    "@rstest/core": "https://pkg.pr.new/web-infra-dev/rstest/@rstest/core@1c6016a45bcad879db511027bd9e6132ed4b4fac",
+    "core-js": "3.48.0",
+    "typescript": "^5.9.3"
+  }
+}

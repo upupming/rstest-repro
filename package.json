@@ -12,5 +12,8 @@
     "lodash-es": "^4.18.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.8"
+  },
+  "dependencies": {
+    "@rsbuild/core": "^2.0.12"
   }
 }
