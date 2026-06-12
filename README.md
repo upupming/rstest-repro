@@ -21,6 +21,9 @@ expose the default export's `then` without binding it back to the underlying
 Promise (the brand check in `Promise.prototype.then` then rejects the wrapper
 as receiver).
 
+The failure is independent of the nearest `package.json` `"type"` field — it
+reproduces both under `"type": "module"` and under a package without `"type"`.
+
 ## Reproduce
 
 ```bash
