@@ -1,7 +1,9 @@
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-import { expect, test } from '@rstest/core'
+import { expect, test, rstest } from '@rstest/core'
+
+// rstest.mocked()
 
 // Control case (passes): `fixtures/cjs-pkg/package.json` has no `"type"`
 // field, so Node's module-syntax detection loads this CommonJS-syntax `.ts`

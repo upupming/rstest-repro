@@ -1,0 +1,1 @@
+globalThis.rstest = vi
