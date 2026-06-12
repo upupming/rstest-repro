@@ -1,0 +1,59 @@
+import "node:module";
+import { logger as logger_logger } from "./2366.js";
+import { setupCommands } from "./1705.js";
+import { prepareCli } from "./7661.js";
+function runCLI() {
+    prepareCli();
+    try {
+        setupCommands();
+    } catch (err) {
+        logger_logger.error('Failed to start Rstest CLI.');
+        logger_logger.error(err);
+        process.exit(1);
+    }
+}
+const check = (name)=>{
+    if (!globalThis.RSTEST_API?.[name]) throw new Error(`Rstest API '${name}' is not registered yet, please make sure you are running in a rstest environment.`);
+};
+const wrapRstestAPI = (name)=>{
+    const fn = (...args)=>{
+        check(name);
+        return globalThis.RSTEST_API[name].call(globalThis.RSTEST_API[name], ...args);
+    };
+    return new Proxy(fn, {
+        get (_target, key, receiver) {
+            if (!globalThis.RSTEST_API?.[name]) return Reflect.get(fn, key, receiver);
+            return Reflect.get(globalThis.RSTEST_API[name], key, receiver);
+        }
+    });
+};
+const wrapRstestUtilitiesAPI = (name)=>new Proxy({}, {
+        get (_target, key, receiver) {
+            check(name);
+            return Reflect.get(globalThis.RSTEST_API?.[name] || {}, key, receiver);
+        }
+    });
+const expect = wrapRstestAPI('expect');
+const assert = wrapRstestAPI('assert');
+const it = wrapRstestAPI('it');
+const test = wrapRstestAPI('test');
+const describe = wrapRstestAPI('describe');
+const beforeAll = wrapRstestAPI('beforeAll');
+const afterAll = wrapRstestAPI('afterAll');
+const beforeEach = wrapRstestAPI('beforeEach');
+const afterEach = wrapRstestAPI('afterEach');
+const rstest = wrapRstestUtilitiesAPI('rstest');
+const rs = wrapRstestUtilitiesAPI('rs');
+const onTestFinished = wrapRstestAPI('onTestFinished');
+const onTestFailed = wrapRstestAPI('onTestFailed');
+function defineConfig(config) {
+    return config;
+}
+function defineInlineProject(config) {
+    return config;
+}
+function defineProject(config) {
+    return config;
+}
+export { createRstest, initCli, loadConfig, mergeProjectConfig, mergeRstestConfig } from "./7661.js";
+export { afterAll, afterEach, assert, beforeAll, beforeEach, defineConfig, defineInlineProject, defineProject, describe, expect, it, onTestFailed, onTestFinished, rs, rstest, runCLI, test };
