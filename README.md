@@ -2,7 +2,7 @@
 
 Originally a repro for two `@rstest/core@0.10.3` issues; both are **fixed** in
 the pkg.pr.new build
-`@rstest/core@https://pkg.pr.new/web-infra-dev/rstest/@rstest/core@ad1ccf802cc28ef1389064578c9069956d945ad6`
+`@rstest/core@https://pkg.pr.new/web-infra-dev/rstest/@rstest/core@1c6016a45bcad879db511027bd9e6132ed4b4fac`
 (see https://github.com/web-infra-dev/rstest/pull/1357), which this repo now
 pins. All tests pass against that build:
 
