@@ -16,3 +16,11 @@ const promiseMjs = await import(url('fixtures/promise.mjs'))
 console.log('promise.mjs ->', await promiseMjs.default)
 
 console.log('\nAll fixtures load correctly under plain Node', process.version)
+
+// Custom `module.register` hooks (mirroring @lynx-js/rspeedy's register/)
+// force the ESM-syntax `.ts` inside a `"type": "commonjs"` package to load.
+const { register } = await import(url('fixtures/register/index.js'))
+const unregister = register()
+const viaHooks = await import(url('fixtures/register/cjs-pkg/esm-config.ts'))
+console.log('register hooks + esm-config.ts ->', viaHooks.default)
+unregister()

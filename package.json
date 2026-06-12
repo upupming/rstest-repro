@@ -8,7 +8,7 @@
     "verify:node": "node verify-node.mjs"
   },
   "devDependencies": {
-    "@rstest/core": "0.10.3",
+    "@rstest/core": "https://pkg.pr.new/web-infra-dev/rstest/@rstest/core@ad1ccf802cc28ef1389064578c9069956d945ad6",
     "lodash-es": "^4.18.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.8"

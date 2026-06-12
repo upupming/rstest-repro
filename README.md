@@ -1,65 +1,53 @@
-# rstest repro: `await`ing a default-exported Promise from a natively-imported `.ts` module throws
+# rstest repro / regression suite
 
-## Bug
+Originally a repro for two `@rstest/core@0.10.3` issues; both are **fixed** in
+the pkg.pr.new build
+`@rstest/core@https://pkg.pr.new/web-infra-dev/rstest/@rstest/core@ad1ccf802cc28ef1389064578c9069956d945ad6`
+(see https://github.com/web-infra-dev/rstest/pull/1357), which this repo now
+pins. All tests pass against that build:
 
-When a test dynamically imports a **`.ts` file outside the bundle graph** (file
-URL → handled by rstest's native ESM loading path), and that module
-`export default`s a **Promise** (or any thenable), awaiting the imported
-`default` throws:
+```bash
+npm install
+npx rstest run        # 7 passed
+node verify-node.mjs  # plain-Node baseline for every fixture
+```
+
+## 1. `await`ing a default-exported Promise from a natively-imported `.ts` module — FIXED
+
+With 0.10.3, dynamically importing (file URL, outside the bundle graph) a
+`.ts` module whose `export default` is a Promise, then awaiting `default`,
+threw:
 
 ```
 TypeError: Method Promise.prototype.then called on incompatible receiver [object Module]
 ```
 
-The same fixture:
+Plain Node and the identical `.mjs` fixture always worked; independent of the
+nearest `package.json` `"type"`. See `test/promise-default.test.ts`.
 
-- loads and awaits fine under **plain Node** (`node verify-node.mjs`), and
-- works inside rstest when the file is **`.mjs`** instead of `.ts`.
+## 2. Top-level mock of an externalized dependency without a static import anchor — FIXED
 
-So the Module wrapper produced by rstest's native `.ts` loading path appears to
-expose the default export's `then` without binding it back to the underlying
-Promise (the brand check in `Promise.prototype.then` then rejects the wrapper
-as receiver).
+With 0.10.3, `rstest.mock('lodash-es', factory)` could silently miss consumers
+(e.g. `src/math.ts`) when the test file had no static
+`import ... from 'lodash-es'`. See `test/top-mock.test.ts` /
+`test/top-mock-with-anchor.test.ts`.
 
-The failure is independent of the nearest `package.json` `"type"` field — it
-reproduces both under `"type": "module"` and under a package without `"type"`.
+## 3. User-registered `module.register` hooks — verified working
 
-## Reproduce
+`fixtures/register/` mirrors `@lynx-js/rspeedy`'s custom loader
+(`module.register()` hooks that force `.ts` to ESM regardless of package
+`"type"`, à la ts-blank-space). `test/register-hooks.test.ts` verifies that
+under rstest:
 
-```bash
-npm install
-npx rstest run        # 1 failed | 2 passed
-node verify-node.mjs  # all fixtures load fine under plain Node
-```
+- with the hooks registered, the ESM-syntax `.ts` inside a
+  `"type": "commonjs"` package loads (same as plain Node + hooks), and
+- without the hooks it is rejected with `Unexpected token 'export'` —
+  matching plain-Node behavior exactly.
 
-- `test/promise-default.test.ts`
-  - `.ts` fixture → **fails** with the receiver TypeError (the bug)
-  - identical `.mjs` fixture → passes (control)
-- `test/ts-cjs-detection.test.ts` → passes (control; shows the native `.ts`
-  import path otherwise behaves like Node, including CJS-syntax detection)
-
-## Fixture
-
-```ts
-// fixtures/promise.ts
-export default Promise.resolve({ source: { entry: 'promise' } })
-```
-
-```ts
-// test (essence)
-const mod = await import(pathToFileURL(p).toString())
-await mod.default // 💥 Promise.prototype.then called on incompatible receiver [object Module]
-```
-
-## Real-world impact
-
-`@lynx-js/rspeedy`'s `loadConfig` supports `lynx.config.ts` files that
-`export default` a Promise; its test suite hits this when running under rstest
-(the config is loaded via a runtime `import(fileURL)`, i.e. outside the bundle
-graph).
+So with the pinned build there is no remaining conflict between user loader
+hooks and rstest.
 
 ## Environment
 
-- `@rstest/core`: 0.10.3
 - Node.js: v24.12.0
 - OS: macOS (darwin, arm64)
