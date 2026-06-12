@@ -47,6 +47,33 @@ under rstest:
 So with the pinned build there is no remaining conflict between user loader
 hooks and rstest.
 
+
+## 4. loadConfig config-flavor demos (decision feedback, expected to FAIL)
+
+```bash
+npx rstest run -c rstest.flavors.config.ts   # 5 failed (by design)
+node verify-flavors.mjs                      # plain Node fails with the SAME errors
+```
+
+Five config flavors that `@lynx-js/rspeedy`'s `loadConfig` tests covered under
+vitest (runtime `import(fileURL)` of user config files):
+
+| flavor | error (identical under rstest and plain Node) |
+|---|---|
+| CommonJS-syntax `.ts` under `"type": "module"` | `module is not defined in ES module scope` |
+| ESM-syntax `.ts` under `"type": "commonjs"` | `Unexpected token 'export'` |
+| ESM-syntax `.js` under `"type": "commonjs"` | `Cannot use import statement outside a module` |
+| `.ts` with `enum` | `TypeScript enum is not supported in strip-only mode` |
+| `.ts` with `const enum` | `TypeScript enum is not supported in strip-only mode` |
+
+These previously passed under vitest only because vite transformed the config
+files (full esbuild TS transform + CJS interop). rstest matches plain-Node
+behavior exactly, so we do **not** consider these rstest bugs — they are
+included to ask the design question: should rstest offer an opt-in vite-like
+full TS transform for runtime-imported files, or is "match Node" the intended
+(and final) semantics? Our `loadConfig` keeps these cases `test.skip`ped for
+now.
+
 ## Environment
 
 - Node.js: v24.12.0
