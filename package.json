@@ -1,0 +1,13 @@
+{
+  "name": "rstest-repro",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "rstest run",
+    "verify:node": "node verify-node.mjs"
+  },
+  "devDependencies": {
+    "@rstest/core": "0.10.3",
+    "typescript": "^5.9.3"
+  }
+}
