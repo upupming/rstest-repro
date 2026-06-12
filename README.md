@@ -90,31 +90,53 @@ All kept as passing regression tests in `test/`:
 - automock without a static import anchor works (lodash-es and
   @rsbuild/core, both npm and a standalone pnpm project)
 
-## 6. One remaining case we could NOT minimize (repros only in the lynx-stack monorepo)
+## 6. Remaining issue (root cause found): automock invisible to dynamic imports when the host `@rspack/core` is older than 2.0.8
 
-In `lynx-family/lynx-stack` (branch `chore/cleanup-webpack-residuals`,
-pnpm 11 monorepo), `rstest.mock('@rsbuild/core', { mock: true })` is still
-invisible to a **dynamic-only** import (no static anchor in the test file);
-with a static `import * as core from '@rsbuild/core'` it works. The same
-case passes here both under npm (`test/fixed-automock-rsbuild-dynamic.test.ts`)
-and under a standalone pnpm project (`pnpm-automock-demo/`), even with
-multiple peer-hashed `@rsbuild/core` instances in `.pnpm` — so it seems to
-need the full monorepo dependency graph. Repro inside lynx-stack:
+Minimal repro: **`pnpm-automock-demo/`** — a standalone pnpm project that pins
+`@rspack/core` to **2.0.6** via `pnpm.overrides`:
 
 ```bash
-git clone -b chore/cleanup-webpack-residuals https://github.com/lynx-family/lynx-stack
-cd lynx-stack && pnpm install
-cd packages/rspeedy/core
-cat > test/__probe.test.ts <<'TS'
-import { expect, rstest, test } from '@rstest/core'
-rstest.mock('@rsbuild/core', { mock: true })
-test('automock dynamic view (no anchor)', async () => {
-  const core = await import('@rsbuild/core')
-  expect(rstest.isMockFunction(core.createRsbuild)).toBe(true)
-})
-TS
-npx rstest run test/__probe.test.ts   # fails: createRsbuild is the real one
+cd pnpm-automock-demo
+pnpm install
+npx rstest run     # 1 failed: automock invisible to dynamic-only import
+                   # (the static-import control passes)
 ```
+
+Root cause (verified by diffing the compiled output in `dist/.rstest-temp`
+with `DEBUG=rstest`):
+
+- with `@rspack/core` **2.0.8**, a dynamic `import('@rsbuild/core')` compiles
+  to a call wrapped with the runtime mock lookup:
+
+  ```js
+  __webpack_require__.e("_rsbuild_core").then(
+    __webpack_require__.rstest_dynamic_require
+      ? __webpack_require__.rstest_dynamic_require.bind(..., "@rsbuild/core?e6a1", "@rsbuild/core")
+      : __webpack_require__.bind(..., "@rsbuild/core?e6a1"))
+  ```
+
+- with `@rspack/core` **2.0.6**, the native `RstestPlugin` does not emit the
+  `rstest_dynamic_require` wrapper at all:
+
+  ```js
+  __webpack_require__.e("_rsbuild_core").then(
+    __webpack_require__.bind(__webpack_require__, "@rsbuild/core?e27c"))
+  ```
+
+  so the doppelganger module is loaded directly and the registered mock
+  (keyed on a different module id, `@rsbuild/core?5ad7`) is silently
+  bypassed — the test receives the real module.
+
+This is why it reproduced in `lynx-family/lynx-stack` (which pins
+`@rspack/core` to 2.0.6 workspace-wide) but not in this repo: rstest resolves
+whatever `@rspack/core` the host installation provides, and silently degrades
+when the host version lacks the injection support.
+
+**Suggestion:** have `@rstest/core` check the resolved `@rspack/core` version
+(or feature-detect `rspack.experiments.RstestPlugin`'s
+`injectDynamicImportOrigin` support) and fail loudly / warn instead of
+silently compiling mocks that dynamic imports bypass — same spirit as the
+new loud error for aliased `rstest.mock` calls.
 
 ## Environment
 
