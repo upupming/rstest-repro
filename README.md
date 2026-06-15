@@ -84,8 +84,8 @@ All kept as passing regression tests in `test/`:
   hoped for
 - automocking a huge module (`rstest.mock('@rsbuild/core', { mock: true })`)
   no longer blows the worker heap (was SIGABRT/OOM)
-- factory-mocking a Node builtin (`node:os`) now works
-  (`test/fixed-builtin-and-inbody-mock.test.ts`)
+- mocking a Node builtin (`node:os`) works for the source module too — see
+  the limitation in section 7
 - `rstest.mock(...)` inside a test body now works
 - automock without a static import anchor works (lodash-es and
   @rsbuild/core, both npm and a standalone pnpm project)
@@ -137,6 +137,35 @@ when the host version lacks the injection support.
 `injectDynamicImportOrigin` support) and fail loudly / warn instead of
 silently compiling mocks that dynamic imports bypass — same spirit as the
 new loud error for aliased `rstest.mock` calls.
+
+
+## 7. Node-builtin mock: works, but test-body `mockReturnValue` needs the `default` export
+
+Contrary to the older `0.10.3` belief that "rstest can't mock Node builtins",
+the current canary **can** mock them (both factory and automock forms reach the
+source module). The real, narrower limitation surfaces only when the return
+value is set from the **test body** via `rstest.mocked(...).mockReturnValue(...)`:
+
+```bash
+npx rstest run test/builtin-mock-namespace-limitation.test.ts   # 2 passed
+```
+
+| how the SOURCE reads the builtin | test-body `mockReturnValue` reaches src? |
+|---|---|
+| `const { default: os } = await import('node:os')` | ✅ yes |
+| `const os = await import('node:os'); os.networkInterfaces()` (namespace named export) | ❌ no — src gets the auto-stub (undefined) |
+
+After `automock`, a builtin's **namespace named export** and its **`default`**
+export are different mock references, so a `mockReturnValue` applied to the
+`default` one is invisible to source code that reads the namespace named
+export. This is why `@lynx-js/rspeedy`'s `findIp` source was switched to read
+`import('node:os')`'s `default` export (so the test's mock — applied to the
+same `default` object — is visible to `src`).
+
+**Suggestion:** make the automocked namespace named exports and `default`
+share the same mock function reference, so `mockReturnValue` on either is
+visible regardless of how the consumer imports the builtin.
+
 
 ## Environment
 
