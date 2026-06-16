@@ -167,6 +167,35 @@ share the same mock function reference, so `mockReturnValue` on either is
 visible regardless of how the consumer imports the builtin.
 
 
+## 8. Mocking a package makes its **re-exported** bindings `undefined` — rstest bug (vitest works)
+
+`rstest.mock('@rsbuild/core', factory)` makes a **named import of a re-exported
+binding** resolve to `undefined`, both in the test file and in consumer modules.
+`@rsbuild/core` re-exports `logger`: `export { logger, ... } from "./756.js"`.
+
+```bash
+npx rstest run  test/reexport-mock.test.ts          # 2 passed → asserts the BUG (logger is undefined)
+npx vitest run  test/reexport-mock.vitest.spec.ts   # 2 passed → vitest does it correctly (logger IS the mock)
+```
+
+| runner | `import { logger } from '@rsbuild/core'` after mocking it | consumer (`src/rsbuild-logger-consumer.ts`) |
+|---|---|---|
+| **vitest** | `logger.error` is the mock ✅ | sees the mock ✅ |
+| **rstest** | `logger` is `undefined` ❌ | crashes: `Cannot read properties of undefined (reading 'error')` ❌ |
+
+Unlike issue #2 (a *direct* export, fixed by a static import anchor), **none** of
+these work around it for a *re-exported* binding: named import, namespace import
+(`import * as ns`), or the static anchor. This blocks tests that mock a package
+(e.g. for one of its real exports) while the source reads another binding that
+the package only **re-exports** — e.g. `@lynx-js/rspeedy` re-exporting `logger`
+from `@rsbuild/core`, where mocking `@lynx-js/rspeedy` (to stub `createRspeedy`)
+makes the source's `logger` `undefined`.
+
+**Suggestion:** when a mock factory provides an export that the original module
+declared via `export { x } from 'origin'`, the mocked module's `x` should win for
+all consumers — as vitest already does.
+
+
 ## Environment
 
 - Node.js: v24.12.0
